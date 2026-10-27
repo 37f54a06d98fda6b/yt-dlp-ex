@@ -2,16 +2,13 @@ import base64
 import urllib.parse
 
 from .common import InfoExtractor
-from ..utils import unescapeHTML, parse_duration, parse_iso8601, unescapeHTML, urljoin, url_or_none
+from ..utils import unescapeHTML, parse_duration, parse_iso8601, unescapeHTML, urljoin
+from ..utils import url_or_none, clean_html, int_or_none
 
 import re
 import unicodedata
-
 from .common import InfoExtractor
-
 import datetime
-import re
-import unicodedata
 
 # LINK https://claude.ai/chat/bfe5366f-de49-4e10-8ea1-274fbe0df5a8
 # LINK (on git usage): https://chatgpt.com/c/6ae08dd6-12e8-83ed-b988-f573e09a7f87
@@ -85,20 +82,11 @@ class MySxyprnIE(InfoExtractor):
         video_id = self._match_id(url)
         webpage = self._download_webpage(url, video_id)
 
-        # vnfo = self._search_regex(r'data-vnfo="([^"]+)"', webpage, "vnfo")
-        # path = self._parse_json(unescapeHTML(vnfo), video_id)[video_id]
         vnfo = self._search_regex(
             r"""data-vnfo\s*=\s*(?P<q>["'])(?P<json>.+?)(?P=q)""", webpage, "vnfo", group="json"
         )
         path = self._parse_json(unescapeHTML(vnfo), video_id)[video_id]
 
-        # import re
-        # title = self._og_search_title(webpage, default=video_id)
-        # title = re.sub(r"\s+on SexyPorn OG$", "", title)
-        # title = re.sub(r"\s*#\S+", "", title)  # drop hashtags
-        # title = re.sub(r"\s+", " ", title).strip() or video_id
-
-        # ['', 'cdn', 'c8', A, B, timestamp, token1, 'token2.vid']
         parts = path.split("/")
         s1 = self._digit_sum(parts[6])
         s2 = self._digit_sum(parts[7].rpartition(".")[0])
@@ -116,6 +104,7 @@ class MySxyprnIE(InfoExtractor):
         )
         title, tags = _build_title(raw_title, upload_date, video_id)
 
+        # -------------------------------
         thumb = (
             self._og_search_thumbnail(webpage, default=None)
             or self._html_search_meta("thumbnailUrl", webpage, default=None)
@@ -123,10 +112,36 @@ class MySxyprnIE(InfoExtractor):
         )
         thumbnail = url_or_none(urljoin(url, thumb)) if thumb else None  # '//host/...' -> 'https://host/...'
 
+        # -------------------------------
+        # in _real_extract, after `webpage` and `url` are set:
+        filesize = int_or_none(
+            self._search_regex(r"""data-mgfs\s*=\s*["']?(\d+)""", webpage, "filesize", default=None)
+        )
+        size_mb = self._search_regex(r"size:\s*<b>([\d.]+)</b>\s*MB", webpage, "approx size", default=None)
+        height = int_or_none(
+            self._search_regex(r"resolution:\s*<b>[^<]*</b>\s*(\d{3,4})", webpage, "height", default=None)
+        )
+        tbr = int_or_none(self._search_regex(r"bitrate:\s*<b>(\d+)</b>", webpage, "bitrate", default=None))
+
+        formats = [
+            {
+                "format_id": "http",
+                "url": url,
+                "ext": "mp4",
+                "height": height,
+                "tbr": tbr,
+                "filesize": filesize,
+                "filesize_approx": None if filesize else (int(float(size_mb) * 1048576) if size_mb else None),
+                "http_headers": {"Referer": url},
+            }
+        ]
+        # -------------------------------
+
         return {
             # "thumbnail": thumbnail,
             # or, if you want to set a Referer for it:
             "thumbnails": [{"url": thumbnail, "http_headers": {"Referer": url}}],
+            "formats": formats,
             "id": video_id,
             "title": title,
             "tags": tags,
