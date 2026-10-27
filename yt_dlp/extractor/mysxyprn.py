@@ -2,32 +2,19 @@ import base64
 import urllib.parse
 
 from .common import InfoExtractor
-from ..utils import unescapeHTML
+from ..utils import unescapeHTML, parse_duration, parse_iso8601, unescapeHTML, urljoin, url_or_none
 
 import re
 import unicodedata
 
 from .common import InfoExtractor
-from ..utils import parse_duration, parse_iso8601, unescapeHTML
+
 import datetime
 import re
 import unicodedata
 
-# def _clean_title(raw, fallback):
-#     t = unicodedata.normalize("NFKC", raw)
-#     t = re.sub(r"\s+on\s+(?:the\s+)?Sexy\s*Porn(?:\s+OG)?\s*$", "", t, flags=re.I)  # site suffix
-#     t = re.sub(r"https?://\S+|\b[\w-]+\.(?:com|net|org|to|so|co|club)\b\S*", " ", t)  # URLs / domains
-#     t = re.sub(r"#\S+", " ", t)  # hashtags
-#     # dates: 27.10.2026, 17-10-2026, 2026-10-17, 17/10/26, and a bare (2026)
-#     t = re.sub(r"\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\b|\b\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}\b", " ", t)
-#     t = re.sub(r"\(\s*(?:19|20)\d{2}\s*\)", " ", t)
-#     t = re.sub(r"^\W*(?:new|watch/download|nsfw)\b\W*", "", t, flags=re.I)  # leading "New", etc.
-#     t = re.sub(r"[^\w\s\-\'&,.()]", " ", t)  # drop emoji and odd symbols, keep unicode letters
-#     t = re.sub(r"\(\s*\)|\[\s*\]", " ", t)  # empty brackets left behind
-#     t = re.sub(r"\s+", " ", t).strip(" -_.,&")
-#     if len(t) > 100:
-#         t = t[:100].rsplit(" ", 1)[0]
-#     return t or fallback
+# LINK https://claude.ai/chat/bfe5366f-de49-4e10-8ea1-274fbe0df5a8
+# LINK (on git usage): https://chatgpt.com/c/6ae08dd6-12e8-83ed-b988-f573e09a7f87
 
 
 _URL_RE = re.compile(
@@ -129,7 +116,17 @@ class MySxyprnIE(InfoExtractor):
         )
         title, tags = _build_title(raw_title, upload_date, video_id)
 
+        thumb = (
+            self._og_search_thumbnail(webpage, default=None)
+            or self._html_search_meta("thumbnailUrl", webpage, default=None)
+            or self._search_regex(r'<video[^>]+poster=["\']([^"\']+)', webpage, "poster", default=None)
+        )
+        thumbnail = url_or_none(urljoin(url, thumb)) if thumb else None  # '//host/...' -> 'https://host/...'
+
         return {
+            # "thumbnail": thumbnail,
+            # or, if you want to set a Referer for it:
+            "thumbnails": [{"url": thumbnail, "http_headers": {"Referer": url}}],
             "id": video_id,
             "title": title,
             "tags": tags,
@@ -142,9 +139,3 @@ class MySxyprnIE(InfoExtractor):
             ),
             "http_headers": {"Referer": url},
         }
-
-        # return {
-        #     "title": _clean_title(raw_title, video_id),
-        #     "tags": re.findall(r"#(\w+)", raw_title),
-        #     "timestamp": parse_iso8601(self._html_search_meta("uploadDate", webpage)),
-        #     "title": self._og_search_title(webpage, default=video_id),
