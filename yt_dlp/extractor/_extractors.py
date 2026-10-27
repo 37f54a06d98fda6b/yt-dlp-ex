@@ -1119,6 +1119,7 @@ from .myspace import (
 from .myspass import MySpassIE
 from .myvideoge import MyVideoGeIE
 from .myvidster import MyVidsterIE
+from .mysxyprn import MySxyprnIE
 from .mzaalo import MzaaloIE
 from .n1 import (
     N1InfoAssetIE,
