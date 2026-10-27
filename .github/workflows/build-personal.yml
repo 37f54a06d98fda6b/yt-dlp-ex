@@ -208,3 +208,75 @@ jobs:
             SHA2-256SUMS
             SHA2-512SUMS
           if-no-files-found: error
+  publish:
+    name: Publish personal GitHub release
+    needs: [prepare, linux, windows, checksums]
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: write
+
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      SOURCE_SHA: ${{ github.sha }}
+      RELEASE_TAG: personal-${{ needs.prepare.outputs.version }}-${{ github.run_id }}-${{ github.run_attempt }}
+
+    steps:
+      - name: Download binaries and checksums
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: release-files
+          pattern: personal-*
+          merge-multiple: true
+
+      - name: Create release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > RELEASE_NOTES.md <<EOF
+          Personal build of this yt-dlp fork.
+
+          - Version: ${VERSION}
+          - Source commit: https://github.com/${GH_REPO}/commit/${SOURCE_SHA}
+          - Platforms: Linux x86-64 and Windows x64
+          - Workflow run: https://github.com/${GH_REPO}/actions/runs/${GITHUB_RUN_ID}
+
+          Download:
+          - Linux standalone executable: \`yt-dlp_linux\`
+          - Windows standalone executable: \`yt-dlp.exe\`
+          - Directory-based packages: \`yt-dlp_linux.zip\` and \`yt-dlp_win.zip\`
+
+          Checksums are provided in \`SHA2-256SUMS\` and \`SHA2-512SUMS\`.
+
+          These builds do not establish a self-update channel.
+          EOF
+
+      - name: Publish GitHub prerelease
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          files=(
+            release-files/yt-dlp_linux
+            release-files/yt-dlp_linux.zip
+            release-files/yt-dlp.exe
+            release-files/yt-dlp_win.zip
+            release-files/SHA2-256SUMS
+            release-files/SHA2-512SUMS
+          )
+
+          # Fail before creating a release if any expected file is missing.
+          for file in "${files[@]}"; do
+            test -s "${file}"
+          done
+
+          gh release create "${RELEASE_TAG}" \
+            --repo "${GH_REPO}" \
+            --target "${SOURCE_SHA}" \
+            --title "Personal build ${VERSION}" \
+            --notes-file RELEASE_NOTES.md \
+            --prerelease \
+            "${files[@]}"
