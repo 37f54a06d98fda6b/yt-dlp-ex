@@ -113,6 +113,8 @@ class MySxyprnIE(InfoExtractor):
         thumbnail = url_or_none(urljoin(url, thumb)) if thumb else None  # '//host/...' -> 'https://host/...'
 
         # -------------------------------
+        video_url = f"https://{host}" + "/".join(parts)
+
         # in _real_extract, after `webpage` and `url` are set:
         filesize = int_or_none(
             self._search_regex(r"""data-mgfs\s*=\s*["']?(\d+)""", webpage, "filesize", default=None)
@@ -126,7 +128,7 @@ class MySxyprnIE(InfoExtractor):
         formats = [
             {
                 "format_id": "http",
-                "url": url,
+                "url": video_url,
                 "ext": "mp4",
                 "height": height,
                 "tbr": tbr,
@@ -136,21 +138,15 @@ class MySxyprnIE(InfoExtractor):
             }
         ]
         # -------------------------------
-
         return {
-            # "thumbnail": thumbnail,
-            # or, if you want to set a Referer for it:
-            "thumbnails": [{"url": thumbnail, "http_headers": {"Referer": url}}],
-            "formats": formats,
             "id": video_id,
             "title": title,
             "tags": tags,
             "timestamp": timestamp,
             "duration": parse_duration(self._html_search_meta("duration", webpage)),
-            "url": f"https://{host}" + "/".join(parts),
-            "ext": "mp4",
+            "formats": formats,
+            "thumbnails": [{"url": thumbnail, "http_headers": {"Referer": url}}] if thumbnail else [],
             "uploader": self._search_regex(
                 r'class="a_name"[^>]*>([^<]+)<', webpage, "uploader", default=None
             ),
-            "http_headers": {"Referer": url},
         }
