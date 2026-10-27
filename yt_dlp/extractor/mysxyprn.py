@@ -137,7 +137,7 @@ class MySxyprnIE(InfoExtractor):
                 "http_headers": {"Referer": url},
             }
         ]
-        # -------------------------------
+        # --------------------------------    
         return {
             "id": video_id,
             "title": title,
