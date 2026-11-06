@@ -36,7 +36,22 @@ def _norm_date(m, upload_date):
     return " " if iso.replace("-", "") == upload_date else iso
 
 
+def _clean_title_markup(raw: str | None) -> str:
+    # Ensure text is a string, even if unescapeHTML returns None.
+    text = unescapeHTML(raw) or ""
+
+    text = re.sub(
+        r"<(script|style)\b[^>]*>.*?</\1\s*>",
+        " ",
+        text,
+        flags=re.I | re.S,
+    )
+
+    return clean_html(text) or ""
+
+
 def _build_title(raw, upload_date, fallback, base_max=100, total_max=150):
+    # t = unicodedata.normalize("NFKC", _clean_title_markup(raw))
     t = unicodedata.normalize("NFKC", raw)
     t = t.translate({0x2018: "'", 0x2019: "'", 0x02BC: "'", 0x201C: '"', 0x201D: '"'})
     t = re.sub(r'(?<=\w)"(?=\w)', "'", t)
@@ -95,14 +110,16 @@ class MySxyprnIE(InfoExtractor):
         parts[1] += "8"
         parts[5] = str(int(parts[5]) - s1 - s2)
         parts.insert(2, base64.b64encode(f"{s1}-{host}-{s2}".encode()).decode().replace("=", "."))
+        # -------------------------------
         raw_title = self._og_search_title(webpage, default=video_id)  # use og:title, not <title>
+        cleaned_title = _clean_title_markup(raw_title)
         timestamp = parse_iso8601(self._html_search_meta("uploadDate", webpage))
         upload_date = (
             datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc).strftime("%Y%m%d")
             if timestamp
             else None
         )
-        title, tags = _build_title(raw_title, upload_date, video_id)
+        title, tags = _build_title(cleaned_title, upload_date, video_id)
 
         # -------------------------------
         thumb = (
@@ -137,7 +154,7 @@ class MySxyprnIE(InfoExtractor):
                 "http_headers": {"Referer": url},
             }
         ]
-        # --------------------------------    
+        # --------------------------------
         return {
             "id": video_id,
             "title": title,
